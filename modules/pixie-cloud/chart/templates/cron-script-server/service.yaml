@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pl-cloud
+  name: cron-script-service
+spec:
+  clusterIP: None
+  ports:
+  - name: tcp-http2
+    port: 50700
+    protocol: TCP
+    targetPort: 50700
+  selector:
+    app: pl-cloud
+    name: cron-script-server
+  type: ClusterIP

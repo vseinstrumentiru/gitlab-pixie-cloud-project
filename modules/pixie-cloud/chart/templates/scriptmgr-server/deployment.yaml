@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+  name: scriptmgr-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: scriptmgr-server
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: scriptmgr-server
+    spec:
+      containers:
+      - env:
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        envFrom:
+        - configMapRef:
+            name: pl-tls-config
+        - configMapRef:
+            name: pl-scriptmgr-config
+        - configMapRef:
+            name: pl-domain-config
+        image: gcr.io/pixie-oss/pixie-prod/cloud/scriptmgr_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 52000
+            scheme: HTTPS
+        name: scriptmgr-server
+        ports:
+        - containerPort: 52000
+          name: http2
+        - containerPort: 52001
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 52000
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: certs
+        secret:
+          secretName: service-tls-certs

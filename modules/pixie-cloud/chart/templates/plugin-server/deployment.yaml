@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+    db: pgsql
+  name: plugin-server
+spec:
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: plugin-server
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: plugin-server
+    spec:
+      containers:
+      - env:
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        - name: PL_DATABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: database-key
+              name: pl-db-secrets
+        - name: PL_CRON_SCRIPT_SERVICE
+          valueFrom:
+            configMapKeyRef:
+              key: PL_CRON_SCRIPT_SERVICE
+              name: pl-service-config
+        - name: PL_SEGMENT_WRITE_KEY
+          valueFrom:
+            configMapKeyRef:
+              key: write-key
+              name: segment-config
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        - configMapRef:
+            name: pl-tls-config
+        - configMapRef:
+            name: pl-domain-config
+        image: gcr.io/pixie-oss/pixie-prod/cloud/plugin_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 50600
+            scheme: HTTPS
+        name: plugin-server
+        ports:
+        - containerPort: 50600
+          name: http2
+        - containerPort: 50601
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 50600
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: certs
+        secret:
+          secretName: service-tls-certs

@@ -1,0 +1,144 @@
+domainName: dev.withpixie.dev
+passthroughProxyPort: "443"
+cloudAuthJwtSigningKey: cMijoff0oEMZfkcCuLMIm8k0noBlWxpfcCrFxW8pyd5vm3yEFcJHgDuTKJOHbcYn
+nodeSelector:
+  dedicated: pixie
+tolerations:
+  - effect: NoExecute
+    key: dedicated
+    value: pixie
+serviceTlsCerts:
+  caCertificate: ""
+  clientCertificate: ""
+  clientKey: ""
+  serverCertificate: ""
+  serverKey: ""
+apiServer:
+  replicas: 1
+  authConnectorCallbackUrl: ""
+  authConnectorName: ""
+  sessionKey: 82y9iNXXMccmCr0JLZuqAn2v
+authServer:
+  replicas: 1
+cloudProxy:
+  replicas: 1
+  tls:
+    certificate: ""
+    key: ""
+profileServer:
+  replicas: 1
+projectManagerServer:
+  replicas: 1
+scriptmgrServer:
+  replicas: 1
+vzmgrServer:
+  replicas: 1
+nats:
+  replicas: 1
+stan:
+  replicas: 1
+  volumeClaimTemplate:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+    volumeMode: Filesystem
+    storageClassName: standard
+
+hydra:
+  clientSecret: TrUm0VPFfWvWhiVeB3dVWy6BMjthH2sxAs4p7zMtlAg3YXy3ZUAOZRdmSji26S8C
+  pairwiseSalt: KL0N9OuVwgs8g1HKsBX20PnAA9EIG6Owf5iMplDIFBVckkG5dglAKNDX5Ht59s8H
+  secretsSystem: qcJhM8SuIDWFRilGLxsNpap5rUh4FnszbsxVaVlcSQDfTBe9Z5UNiX1mQ65Kkbzi
+ingress:
+  enabled: true
+letsencrypt:
+  enabled: true
+extraObjects: {}
+
+postgresql:
+  install: true
+  host: plc-postgresql
+  fullnameOverride: plc-postgresql
+  global:
+    storageClass: standard
+  persistence:
+    storageClass: standard
+    mountPath: /tmp/postgresql
+  postgresqlDataDir: /tmp/postgresql/data
+  auth:
+    username: pl
+    password: plcpassw0rd
+    database: pl
+    databaseKey: f0(bXh3PyxxeW(Z3WMeoT6kn
+    existingSecret: pl-db-secrets
+    secretKeys:
+      userPasswordKey: PL_POSTGRES_PASSWORD
+  primary:
+    nodeSelector:
+      dedicated: pixie
+    tolerations:
+      - effect: NoExecute
+        key: dedicated
+        value: pixie
+    service:
+      ports:
+        postgresql: "5432"
+elasticsearch:
+  install: true
+  esMajorVersion: 7
+  nodeSelector:
+    dedicated: pixie
+  tolerations:
+    - effect: NoExecute
+      key: dedicated
+      value: pixie
+  minimumMasterNodes: 1
+  replicas: 1
+  image: elasticsearch
+  masterService: plc-elasticsearch
+  elasticPassword: elastic
+  connectionUrl: https://plc-elasticsearch-headless.plc:9200
+  clusterHealthCheckParams: 'wait_for_status=yellow&timeout=1s'
+  volumeClaimTemplate:
+    accessModes: ["ReadWriteOnce"]
+    resources:
+      requests:
+        storage: 50Gi
+    storageClassName: standard
+  secretMounts:
+    - name: elastic-certificates
+      secretName: service-tls-certs
+      path: /usr/share/elasticsearch/config/certs
+      defaultMode: 0755
+
+  protocol: https
+  esConfig:
+    elasticsearch.yml: |
+      ingest.geoip.downloader.enabled: false
+      xpack.security.enabled: true
+      xpack.security.transport.ssl.enabled: true
+      xpack.security.transport.ssl.verification_mode: certificate
+      xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certs/client.key
+      xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certs/client.crt
+      xpack.security.transport.ssl.certificate_authorities: [ "/usr/share/elasticsearch/config/certs/ca.crt" ]
+      xpack.security.http.ssl.enabled: true
+      xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certs/server.key
+      xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certs/server.crt
+      xpack.security.http.ssl.certificate_authorities: [ "/usr/share/elasticsearch/config/certs/ca.crt" ]
+  extraEnvs:
+    - name: ELASTIC_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elastic-config-credentials
+          key: password
+  extraInitContainers:
+    - name: file-permissions
+      image: busybox:1.34.1
+      command: ['chown', '-R', '1000:1000', '/usr/share/elasticsearch/']
+      volumeMounts:
+        - mountPath: /usr/share/elasticsearch/data
+          name: elasticsearch-master
+      securityContext:
+        privileged: true
+        runAsUser: 0

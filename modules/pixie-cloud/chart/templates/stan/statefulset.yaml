@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-stan
+  name: pl-stan
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pl-cloud
+      component: cloud-deps
+      name: pl-stan
+  serviceName: pl-stan
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        component: cloud-deps
+        name: pl-stan
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - pl-stan
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - args:
+        - -sc
+        - /etc/stan-config/stan.conf
+        env:
+        - name: GOGC
+          value: "400"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: nats-streaming:0.22.1
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8222
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        name: pl-stan
+        ports:
+        - containerPort: 8222
+          name: monitor
+        - containerPort: 7777
+          name: metrics
+        readinessProbe:
+          httpGet:
+            path: /streaming/serverz
+            port: 8222
+          initialDelaySeconds: 120
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 0
+        volumeMounts:
+        - mountPath: /etc/stan-config
+          name: config-volume
+        - mountPath: /data/stan
+          name: stan-sts-vol
+        - mountPath: /etc/nats/certs
+          name: nats-server-tls-volume
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - configMap:
+          name: stan-config
+        name: config-volume
+      - name: nats-server-tls-volume
+        secret:
+          secretName: service-tls-certs
+  volumeClaimTemplates:
+  - metadata:
+      labels:
+        app: pl-cloud
+        component: cloud-deps
+      name: stan-sts-vol
+    spec:
+{{ toYaml .Values.stan.volumeClaimTemplate | indent 6 }}

@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+  name: cloud-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: cloud-proxy-server
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: cloud-proxy-server
+    spec:
+      containers:
+      - env:
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        - name: PL_TLS_CERT
+          value: /certs/tls.crt
+        - name: PL_TLS_KEY
+          value: /certs/tls.key
+        - name: PL_API_SERVICE_HTTP
+          valueFrom:
+            configMapKeyRef:
+              key: PL_API_SERVICE_HTTP
+              name: pl-service-config
+        - name: PL_SEGMENT_UI_WRITE_KEY
+          valueFrom:
+            configMapKeyRef:
+              key: ui-write-key
+              name: segment-config
+        - name: PL_SEGMENT_CLI_WRITE_KEY
+          valueFrom:
+            configMapKeyRef:
+              key: cli-write-key
+              name: segment-config
+        envFrom:
+        - configMapRef:
+            name: pl-oauth-config
+        - configMapRef:
+            name: pl-domain-config
+        - configMapRef:
+            name: pl-service-config
+        - configMapRef:
+            name: pl-ory-service-config
+        - configMapRef:
+            name: pl-ld-config
+        - configMapRef:
+            name: pl-analytics-config
+        - configMapRef:
+            name: pl-announcement-config
+        - configMapRef:
+            name: pl-contact-config
+        image: gcr.io/pixie-oss/pixie-prod/cloud/proxy_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 56000
+            scheme: HTTPS
+        name: cloud-proxy-server
+        ports:
+        - containerPort: 56000
+          name: http2
+        - containerPort: 56001
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 56000
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+      - args:
+        - -c
+        - /etc/envoy.yaml
+        - --service-cluster
+        - $(POD_NAME)
+        command:
+        - envoy
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        image: envoyproxy/envoy:v1.12.2
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 56004
+            scheme: HTTPS
+        name: envoy
+        ports:
+        - containerPort: 56004
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 56004
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+        - mountPath: /etc/envoy.yaml
+          name: envoy-yaml
+          subPath: envoy.yaml
+        - mountPath: /service-certs
+          name: service-certs
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: service-certs
+        secret:
+          secretName: service-tls-certs
+      - configMap:
+          name: proxy-envoy-config
+        name: envoy-yaml
+      - name: certs
+        secret:
+          secretName: cloud-proxy-tls-certs

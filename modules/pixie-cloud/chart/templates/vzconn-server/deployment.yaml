@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+  name: vzconn-server
+spec:
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: vzconn-server
+  template:
+    metadata:
+      annotations:
+        prometheus.io/port: "51600"
+        prometheus.io/scheme: https
+        prometheus.io/scrape: "true"
+      labels:
+        app: pl-cloud
+        monitoring.gke.io/scrape: "true"
+        name: vzconn-server
+    spec:
+      containers:
+      - env:
+        - name: PL_SERVER_TLS_CERT
+          value: /proxycerts/tls.crt
+        - name: PL_SERVER_TLS_KEY
+          value: /proxycerts/tls.key
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        - name: PL_VZMGR_SERVICE
+          valueFrom:
+            configMapKeyRef:
+              key: PL_VZMGR_SERVICE
+              name: pl-service-config
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        - configMapRef:
+            name: pl-tls-config
+        - configMapRef:
+            name: pl-domain-config
+        - configMapRef:
+            name: pl-errors-config
+            optional: true
+        image: gcr.io/pixie-oss/pixie-prod/cloud/vzconn_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 51600
+            scheme: HTTPS
+        name: vzconn-server
+        ports:
+        - containerPort: 51600
+          name: http2
+        - containerPort: 51601
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 51600
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+        - mountPath: /proxycerts
+          name: proxycerts
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: certs
+        secret:
+          secretName: service-tls-certs
+      - name: proxycerts
+        secret:
+          secretName: cloud-proxy-tls-certs

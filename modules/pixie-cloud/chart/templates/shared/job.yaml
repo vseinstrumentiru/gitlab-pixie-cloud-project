@@ -1,0 +1,64 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: pl-cloud
+    jobgroup: plugin-db-updater
+  name: plugin-db-updater-job
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        jobgroup: plugin-db-updater
+      name: plugin-db-updater-job
+    spec:
+      containers:
+      - command:
+        - /plugin_db_updater/load_db
+        env:
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        - name: PL_PLUGIN_REPO
+          value: pixie-io/pixie-plugin
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        image: gcr.io/pixie-oss/pixie-dev/cloud/plugin/load_db:latest
+        name: updater
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - until pg_isready -h ${PL_POSTGRES_HOSTNAME} -p ${PL_POSTGRES_PORT}; do echo
+          "waiting for postgres"; sleep 2; done;
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        image: postgres:14-alpine
+        name: postgres-wait
+      restartPolicy: Never
+      volumes:
+      - name: pl-db-secrets
+        secret:
+          secretName: pl-db-secrets
+  ttlSecondsAfterFinished: 10

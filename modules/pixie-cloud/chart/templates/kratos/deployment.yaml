@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+    name: kratos
+  name: kratos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: kratos
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: kratos
+    spec:
+      containers:
+      - args:
+        - serve
+        - -c
+        - /etc/config/kratos/kratos.yml
+        - --dev
+        env:
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        - name: DSN
+          value: postgres://$(PL_POSTGRES_USERNAME):$(PL_POSTGRES_PASSWORD)@$(PL_POSTGRES_HOSTNAME):$(PL_POSTGRES_PORT)/$(PL_POSTGRES_DB)?sslmode=disable&max_conns=20&max_idle_conns=4
+        - name: LOG_LEVEL
+          value: trace
+        - name: PL_WORK_DOMAIN
+          value: work.$(PL_DOMAIN_NAME)
+        - name: PL_OAUTH_DOMAIN
+          value: $(PL_WORK_DOMAIN)/oauth
+        - name: FRONTEND_URL
+          value: https://$(PL_WORK_DOMAIN)/auth/ossauth
+        - name: ADMIN_URL
+          value: http://kratos:4434
+        - name: AUTH_LOGIN_URL
+          value: https://$(PL_WORK_DOMAIN)/auth/password-login
+        - name: SERVE_PUBLIC_BASE_URL
+          value: https://$(PL_OAUTH_DOMAIN)/kratos/
+        - name: SERVE_ADMIN_BASE_URL
+          value: $(ADMIN_URL)/
+        - name: SELFSERVICE_DEFAULT_BROWSER_RETURN_URL
+          value: $(AUTH_LOGIN_URL)/
+        - name: HYDRA_LOGIN_URL
+          value: https://$(PL_WORK_DOMAIN)/api/auth/oauth/login
+        - name: SELFSERVICE_WHITELISTED_RETURN_URLS
+          value: $(FRONTEND_URL)/,$(HYDRA_LOGIN_URL)
+        - name: SELFSERVICE_FLOWS_SETTINGS_UI_URL
+          value: https://$(PL_WORK_DOMAIN)/auth/password/recovery
+        - name: SELFSERVICE_FLOWS_SETTINGS_AFTER_PASSWORD_DEFAULT_BROWSER_RETURN_URL
+          value: https://$(PL_WORK_DOMAIN)/
+        - name: SELFSERVICE_FLOWS_RECOVERY_UI_URL
+          value: https://$(PL_WORK_DOMAIN)/auth/password/recovery
+        - name: SELFSERVICE_FLOWS_LOGOUT_AFTER_DEFAULT_BROWSER_RETURN_URL
+          value: $(AUTH_LOGIN_URL)
+        - name: SELFSERVICE_FLOWS_LOGIN_UI_URL
+          value: $(AUTH_LOGIN_URL)
+        - name: SELFSERVICE_FLOWS_ERROR_UI_URL
+          value: https://$(PL_WORK_DOMAIN)/auth/password/error
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        - configMapRef:
+            name: pl-domain-config
+        image: oryd/kratos:v0.5.5
+        name: server
+        ports:
+        - containerPort: 4433
+        - containerPort: 4434
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/config/kratos
+          name: config
+      initContainers:
+      - args:
+        - -c
+        - /etc/config/kratos/kratos.yml
+        - migrate
+        - sql
+        - -e
+        - --yes
+        env:
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        - name: DSN
+          value: postgres://$(PL_POSTGRES_USERNAME):$(PL_POSTGRES_PASSWORD)@$(PL_POSTGRES_HOSTNAME):$(PL_POSTGRES_PORT)/$(PL_POSTGRES_DB)?sslmode=disable&max_conns=20&max_idle_conns=4
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        image: oryd/kratos:v0.5.5
+        name: migrate
+        resources: {}
+        volumeMounts:
+        - mountPath: /etc/config/kratos
+          name: config
+      restartPolicy: Always
+      serviceAccountName: ""
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - configMap:
+          items:
+          - key: kratos.yml
+            path: kratos.yml
+          - key: identity.schema.json
+            path: identity.schema.json
+          name: kratos-config
+        name: config

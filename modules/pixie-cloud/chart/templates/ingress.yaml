@@ -1,0 +1,117 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pixie-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - work.{{ .Values.domainName }}
+        - dev.{{ .Values.domainName }}
+        - docs.{{ .Values.domainName }}
+      secretName: pixie-tls-cert
+  rules:
+    - host: work.{{ .Values.domainName }}
+      http: &http_rules
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cloud-proxy-service
+                port:
+                  number: 443
+          - path: /px.api.vizierpb.VizierService/
+            pathType: Prefix
+            backend:
+              service:
+                name: cloud-proxy-service
+                port:
+                  number: 4444
+    - host: docs.{{ .Values.domainName }}
+      http: *http_rules
+    - host: {{ .Values.domainName }}
+      http: *http_rules
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pixie-ingress-grpc
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPCS"
+spec:
+  tls:
+    - hosts:
+       - cloud.{{ .Values.domainName }}
+       - segment.{{ .Values.domainName }}
+      secretName: pixie-tls-cert
+  rules:
+    - host: cloud.{{ .Values.domainName }}
+      http: &http_rules
+        paths:
+          - path: /pl.cloudapi.ArtifactTracker/
+            pathType: Prefix
+            backend: &backend_cloud_proxy_5555
+              service:
+                name: cloud-proxy-service
+                port:
+                  number: 5555
+          - path: /px.services.VZConnService/
+            pathType: Prefix
+            backend:
+              service:
+                name: vzconn-service
+                port:
+                  number: 51600
+          - path: /px.cloudapi.ArtifactTracker/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.APIKeyManager/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.AuthService/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.ConfigService/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.OrganizationService/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.PluginService/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.UserService/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.VizierClusterInfo/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.VizierDeploymentKeyManager/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+          - path: /px.cloudapi.VizierImageAuthorization/
+            pathType: Prefix
+            backend: *backend_cloud_proxy_5555
+    - host: segment.{{ .Values.domainName }}
+      http: *http_rules
+{{- end }}
+{{- if .Values.letsencrypt.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: pixie
+spec:
+  commonName: {{ .Values.domainName }}
+  dnsNames:
+  - {{ .Values.domainName }}
+  - '*.{{ .Values.domainName }}'
+  issuerRef:
+    kind: ClusterIssuer
+    name: route53
+  secretName: pixie-tls-cert
+{{- end }}

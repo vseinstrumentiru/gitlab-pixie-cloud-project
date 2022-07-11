@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  PL_MD_INDEX_NAME: md_entities_8
+  PL_MD_INDEX_REPLICAS: "4"
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-indexer-config

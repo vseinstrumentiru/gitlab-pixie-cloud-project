@@ -1,0 +1,12 @@
+apiVersion: v2
+name: pixie-cloud
+appVersion: 1.0.0
+version: 1.0.0
+dependencies:
+  - name: elasticsearch
+    version: 7.17.3
+    condition: elasticsearch.install
+  - name: postgresql
+    version: 11.6.12
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.install

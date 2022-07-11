@@ -1,0 +1,14 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: pl-stan-pdb
+spec:
+  minAvailable: 51%
+  selector:
+    matchLabels:
+      app: pl-cloud
+      component: cloud-deps
+      name: pl-stan

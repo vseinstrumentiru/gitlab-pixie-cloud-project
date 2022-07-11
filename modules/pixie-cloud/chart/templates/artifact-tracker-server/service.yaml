@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pl-cloud
+  name: artifact-tracker-service
+spec:
+  clusterIP: None
+  ports:
+  - name: tcp-http2
+    port: 50750
+    protocol: TCP
+    targetPort: 50750
+  selector:
+    app: pl-cloud
+    name: artifact-tracker-server
+  type: ClusterIP

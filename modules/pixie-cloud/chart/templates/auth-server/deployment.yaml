@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+    db: pgsql
+  name: auth-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: auth-server
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: auth-server
+    spec:
+      containers:
+      - env:
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        - name: PL_AUTH0_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: auth0-client-id
+              name: cloud-auth0-secrets
+              optional: true
+        - name: PL_AUTH0_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: auth0-client-secret
+              name: cloud-auth0-secrets
+              optional: true
+        - name: PL_PROFILE_SERVICE
+          valueFrom:
+            configMapKeyRef:
+              key: PL_PROFILE_SERVICE
+              name: pl-service-config
+        - name: PL_PROJECT_MANAGER_SERVICE
+          valueFrom:
+            configMapKeyRef:
+              key: PL_PROJECT_MANAGER_SERVICE
+              name: pl-service-config
+        - name: PL_DATABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: database-key
+              name: pl-db-secrets
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        - name: PL_OAUTH_PROVIDER
+          valueFrom:
+            configMapKeyRef:
+              key: PL_OAUTH_PROVIDER
+              name: pl-oauth-config
+        - name: PL_HYDRA_CLIENT_ID
+          valueFrom:
+            configMapKeyRef:
+              key: PL_AUTH_CLIENT_ID
+              name: pl-oauth-config
+        - name: PL_AUTH_URI
+          valueFrom:
+            configMapKeyRef:
+              key: PL_AUTH_URI
+              name: pl-oauth-config
+        - name: PL_AUTH0_HOST
+          value: https://$(PL_AUTH_URI)
+        envFrom:
+        - configMapRef:
+            name: pl-tls-config
+        - configMapRef:
+            name: pl-db-config
+        - configMapRef:
+            name: pl-domain-config
+        - configMapRef:
+            name: pl-support-access-config
+        - configMapRef:
+            name: pl-ory-service-config
+        - configMapRef:
+            name: pl-errors-config
+            optional: true
+        image: gcr.io/pixie-oss/pixie-prod/cloud/auth_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 50100
+            scheme: HTTPS
+        name: auth-server
+        ports:
+        - containerPort: 50100
+          name: http2
+        - containerPort: 50101
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 50100
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: certs
+        secret:
+          secretName: service-tls-certs

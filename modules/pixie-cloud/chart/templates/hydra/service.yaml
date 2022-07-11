@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pl-cloud
+    name: hydra
+  name: hydra
+spec:
+  ports:
+  - name: public
+    port: 4444
+    targetPort: 4444
+  - name: admin
+    port: 4445
+    targetPort: 4445
+  selector:
+    app: pl-cloud
+    name: hydra

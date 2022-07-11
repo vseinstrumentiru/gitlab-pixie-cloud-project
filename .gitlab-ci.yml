@@ -1,0 +1,64 @@
+stages:
+  - verify
+  - plan
+  - deploy
+
+image: hashicorp/terraform:1.2.4
+
+variables:
+  PLAN: plan.cache
+  PLAN_JSON: plan.json
+  TF_ROOT: "$CI_PROJECT_DIR/deployment/$CI_ENVIRONMENT_NAME"
+  TF_ADDRESS: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/terraform/state/$CI_ENVIRONMENT_NAME"
+
+before_script:
+  - curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.24.2/bin/linux/amd64/kubectl
+  - chmod +x ./kubectl
+  - mv ./kubectl /usr/local/bin/kubectl
+  - echo "$KUBECONFIG_DATA" > "$KUBECONFIG"
+  - cd $TF_ROOT
+  - >
+    terraform init
+    -backend-config="address=$TF_ADDRESS"
+    -backend-config="lock_address=$TF_ADDRESS/lock"
+    -backend-config="unlock_address=$TF_ADDRESS/lock"
+    -backend-config="username=$CI_REGISTRY_USER"
+    -backend-config="password=$CI_REGISTRY_PASSWORD"
+    -backend-config="lock_method=POST"
+    -backend-config="unlock_method=DELETE"
+    -backend-config="retry_wait_min=5"
+
+verify prod:
+  environment: prod
+  stage: verify
+  script:
+    - terraform validate
+  tags:
+    - agent
+
+plan prod:
+  environment: prod
+  artifacts:
+    name: plan
+    paths:
+      - "$TF_ROOT/$PLAN"
+    reports:
+      terraform: "$TF_ROOT/$PLAN_JSON"
+  script:
+    - "terraform plan -out=$PLAN"
+  stage: plan
+  tags:
+    - agent
+
+deploy prod:
+  dependencies:
+    - plan prod
+  environment: prod
+  stage: deploy
+  script:
+    - "terraform apply -input=false $PLAN"
+  tags:
+    - agent
+  when: manual
+  only:
+    - tags

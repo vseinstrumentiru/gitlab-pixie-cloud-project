@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+  name: metrics-server
+spec:
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: metrics-server
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: metrics-server
+    spec:
+      containers:
+      - env:
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        envFrom:
+        - configMapRef:
+            name: pl-tls-config
+        - configMapRef:
+            name: pl-domain-config
+        - configMapRef:
+            name: pl-bq-config
+        image: gcr.io/pixie-oss/pixie-prod/cloud/metrics_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 50800
+            scheme: HTTPS
+        name: metrics-server
+        ports:
+        - containerPort: 50800
+          name: http2
+        - containerPort: 50801
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 50800
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+        - mountPath: /creds
+          name: bq-access-sa
+          readOnly: true
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: certs
+        secret:
+          secretName: service-tls-certs
+      - name: bq-access-sa
+        secret:
+          optional: true
+          secretName: bq-access-sa

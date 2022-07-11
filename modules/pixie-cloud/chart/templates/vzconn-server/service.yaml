@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cloud.google.com/app-protocols: '{"tcp-http2":"HTTP2"}'
+    cloud.google.com/load-balancer-type: internal
+  labels:
+    app: pl-cloud
+  name: vzconn-service
+spec:
+  ports:
+  - name: tcp-http2
+    port: 51600
+    protocol: TCP
+    targetPort: 51600
+  selector:
+    app: pl-cloud
+    name: vzconn-server
+  type: LoadBalancer

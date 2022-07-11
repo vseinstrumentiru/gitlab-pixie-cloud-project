@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+    db: pgsql
+  name: artifact-tracker-server
+spec:
+  selector:
+    matchLabels:
+      app: pl-cloud
+      name: artifact-tracker-server
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: artifact-tracker-server
+    spec:
+      containers:
+      - env:
+        - name: PL_VIZIER_VERSION
+          value: 0.11.1
+        - name: PL_CLI_VERSION
+          value: 0.7.9
+        - name: PL_OPERATOR_VERSION
+          value: 0.0.26
+        - name: PL_JWT_SIGNING_KEY
+          valueFrom:
+            secretKeyRef:
+              key: jwt-signing-key
+              name: cloud-auth-secrets
+        - name: PL_POSTGRES_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_USERNAME
+              name: pl-db-secrets
+        - name: PL_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: PL_POSTGRES_PASSWORD
+              name: pl-db-secrets
+        envFrom:
+        - configMapRef:
+            name: pl-db-config
+        - configMapRef:
+            name: pl-tls-config
+        - configMapRef:
+            name: pl-artifact-config
+        - configMapRef:
+            name: pl-domain-config
+        image: gcr.io/pixie-oss/pixie-prod/cloud/artifact_tracker_server_image:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 50750
+            scheme: HTTPS
+        name: artifact-tracker-server
+        ports:
+        - containerPort: 50750
+          name: http2
+        - containerPort: 50751
+          name: metrics-http
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 50750
+            scheme: HTTPS
+        volumeMounts:
+        - mountPath: /certs
+          name: certs
+        - mountPath: /creds
+          name: artifact-access-sa
+          readOnly: true
+      {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+      {{- end }}
+      volumes:
+      - name: certs
+        secret:
+          secretName: service-tls-certs
+      - name: artifact-access-sa
+        secret:
+          optional: true
+          secretName: artifact-access-sa
