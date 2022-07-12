@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 set -e
 
@@ -30,7 +30,7 @@ kubectl create secret generic -n "${namespace}" \
   --from-literal=session-key="$(< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w 24 | head -n 1)"
 
 SERVICE_TLS_CERTS="$(mktemp -d)"
-pushd "${SERVICE_TLS_CERTS}" || exit 1
+cd "${SERVICE_TLS_CERTS}"
 
 cat << EOS >> ssl.conf
 [ req ]

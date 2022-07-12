@@ -71,12 +71,16 @@ postgresql:
     secretKeys:
       userPasswordKey: PL_POSTGRES_PASSWORD
   primary:
+    nodeSelector: {}
+    tolerations: []
     service:
       ports:
         postgresql: "5432"
 elasticsearch:
   install: true
   esMajorVersion: 7
+  nodeSelector: {}
+  tolerations: []
   minimumMasterNodes: 1
   replicas: 1
   image: elasticsearch
