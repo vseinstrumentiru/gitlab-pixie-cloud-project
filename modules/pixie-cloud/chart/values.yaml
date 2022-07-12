@@ -1,12 +1,8 @@
 domainName: dev.withpixie.dev
 passthroughProxyPort: "443"
 cloudAuthJwtSigningKey: cMijoff0oEMZfkcCuLMIm8k0noBlWxpfcCrFxW8pyd5vm3yEFcJHgDuTKJOHbcYn
-nodeSelector:
-  dedicated: pixie
-tolerations:
-  - effect: NoExecute
-    key: dedicated
-    value: pixie
+nodeSelector: {}
+tolerations: []
 serviceTlsCerts:
   caCertificate: ""
   clientCertificate: ""
@@ -75,24 +71,12 @@ postgresql:
     secretKeys:
       userPasswordKey: PL_POSTGRES_PASSWORD
   primary:
-    nodeSelector:
-      dedicated: pixie
-    tolerations:
-      - effect: NoExecute
-        key: dedicated
-        value: pixie
     service:
       ports:
         postgresql: "5432"
 elasticsearch:
   install: true
   esMajorVersion: 7
-  nodeSelector:
-    dedicated: pixie
-  tolerations:
-    - effect: NoExecute
-      key: dedicated
-      value: pixie
   minimumMasterNodes: 1
   replicas: 1
   image: elasticsearch

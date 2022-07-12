@@ -5,6 +5,7 @@ version: 1.0.0
 dependencies:
   - name: elasticsearch
     version: 7.17.3
+    repository: https://helm.elastic.co/helm/elasticsearch
     condition: elasticsearch.install
   - name: postgresql
     version: 11.6.12
